@@ -1,0 +1,630 @@
+---
+title: "DSC5103 statistics final project"
+subtitle: Predicting blood donation of individuals in March 2007
+date: "Nov 2017"
+author: "Section G1;Group 04 (Members: CHO ZIN TUN, HAN YILI, SWETHA NARAYANAN, TOH PEI XUAN, ZHOU FENGYI)"
+output:
+html_document:
+highlight: tango
+theme: united
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+#set the working direction in rmarkdown
+knitr::opts_knit$set(root.dir = "D:/2_Materials/1_Personal/21_MSBA/5_Semester 1/3_STATISTICS/Final project/3_Predict Blood Donations/Datasets/Training data")
+
+```
+## 1) Introduction
+
+This data is obtained from a mobile blood donation vehicle in Taiwan. The Blood Transfusion Service Center drives to different universities and collects blood as part of a blood drive. This data is stored at UCI Machine Learning repository.
+https://archive.ics.uci.edu/ml/datasets/Blood+Transfusion+Service+Center
+
+
+Predictors provided are:
+
+1. months since last donation
+
+2. total number of donation
+
+3. Total Volume Donated (c.c.)
+
+4. Months since First Donation
+
+
+We want to make predictions based on these characteristics to see if the person dontaes blood on March 2007.
+
+### 1a) Data Cleansing
+
+We start with loading and cleaning the data for training and testing
+
+```{r}
+datamodel=read.csv("Blood.csv")
+summary(datamodel)
+sum(is.na(datamodel[,]))
+```
+
+There is no missing values in the data;
+
+Our variable of interest "Made.Donation.In.March.2007" are binary values; 1 means the person donated blood in March 2007, while 0 means he/she did not
+```{r}
+datamodel$Made.Donation.in.March.2007=as.factor(datamodel$Made.Donation.in.March.2007)
+```
+### 1b) Visualisation of data
+```{r}
+library(lattice)
+#Scatterplot
+pairs(~Months.since.Last.Donation+Number.of.Donations+Total.Volume.Donated..c.c..+Months.since.First.Donation,data=datamodel, 
+      main="Simple Scatterplot Matrix")
+par(mfrow=c(2,2))
+```
+###Scatterplot
+What is quite obvious is that the number of donations have linear relationship with the total volume donated, which is reasonable.
+
+Between months since last donation and number of donations, these two variables, we can see that people have recently donate blood tend to have more total number of donations up till now. Equivalently, months since last donation and total volume donated have similar relationship, which means people have recently donate blood tend to have donated more volume up till now. 
+
+However, we can also find that the months since first donation does not have close relationship with other variables.
+
+```{r}
+#Boxplot
+plot(datamodel$Made.Donation.in.March.2007,datamodel$Months.since.Last.Donation,main="Months since Last Donation")
+plot(datamodel$Made.Donation.in.March.2007,datamodel$Number.of.Donations,main="Number of Donations")
+plot(datamodel$Made.Donation.in.March.2007,datamodel$Total.Volume.Donated..c.c..,main="Total Volume Donated")
+plot(datamodel$Made.Donation.in.March.2007,datamodel$Months.since.First.Donation,main="Months since First Donation")
+par(mfrow=c(2,2))
+```
+###Boxplot
+From the first graph, we can observe that people who recently( within 5 months until March 2007) came to donate blood had come on March 2007 to donate again. 
+
+The second and third graph shows that the people who have donated higher number of times and higher volume have come back to donate blood on March 2007. 
+
+From the fourth graph, it seems that people who came to donate again on March 2007 is not related with when he did his first donation.
+
+```{r}
+#Density plot
+plot(density(datamodel$Months.since.Last.Donation),main="Months since Last Donation")
+plot(density(datamodel$Number.of.Donations),main="Number of Donations")
+plot(density(datamodel$Total.Volume.Donated..c.c..),main="Total Volume Donated")
+plot(density(datamodel$Months.since.First.Donation),main="Months since First Donation")
+
+par(mfrow=c(2,2))
+#for(i in 2:5) {
+#  hist(datamodel[,i], main=names(datamodel)[i])
+#}
+```
+###Densityplot
+For the first graph, we can find that there are more people who just donated before March 2007 and lesser people who donated long time ago before March 2007. On average the months since last donation until March 2007 are around 3-5 months.
+
+For the second and third graph, the shape of the density curve is similar which makes sense because the volume of every donation should be based on a standard unit, hence the more times a person donated blood, the more volume he would have donated. we can also observe that there are more number of people who donated a smaller number of volume and times.
+
+The fourth graph shows the distribution of months since first donation. From this we can observe that most people’s first donation is around 20 months ago until March 2007. 
+
+
+### 1c) Feature Engineering
+
+There is a multicollinearity issue in the model because Number.Of.Donations and Total.Volume.Donated..c.c.. are perfectly correlated (the correlation is 1). 
+So we consider only one of the two variables - Number.Of.Donations
+```{r}
+cor(datamodel[,4],datamodel[,3])
+datamodel = datamodel[, -4]
+```
+### 1d) Splitting of Data into training and validation set
+
+We split the data into training and validation set to enable testing of the various models
+```{r}
+a=229629
+N=nrow(datamodel)
+set.seed(a)
+Perct=0.7
+train.index <- sample(1:N, round(N*Perct))
+valid.index <- - train.index
+
+datatrain=datamodel[train.index,]
+datavalid=datamodel[valid.index,]
+
+xtrain=model.matrix(Made.Donation.in.March.2007 ~ ., datatrain)[,-c(1,2)]
+ytrain=datatrain[, "Made.Donation.in.March.2007"]
+xvalid=model.matrix(Made.Donation.in.March.2007 ~ ., datavalid)[,-c(1,2)]
+yvalid=datavalid[, "Made.Donation.in.March.2007"]
+
+```
+## 2) Building Models
+
+We build a series of models and predict the probabilities of a person returning to donate blood on March 2007
+
+### 2a) Logistic regression model
+```{r}
+glm <- glm(Made.Donation.in.March.2007 ~ ., data=datatrain, family=binomial())
+summary(glm)
+
+## model selectin by AIC
+library("MASS")
+glm.best <- stepAIC(glm, direction="both")
+summary(glm.best)
+
+## categorical prediction (use fixed cutoff = 0.5)
+glm.prob <- predict(glm.best, newdata=datavalid, type="response")
+glm.pred <- ifelse(glm.prob > 0.5,"P1","P0")
+
+# confusion matrix
+confusion.mat <- table(glm.pred, datavalid$Made.Donation.in.March.2007)
+confusion.mat
+
+misclassfication_rate_glm <- 1 - (confusion.mat[2, 2] + confusion.mat[1, 1]) / nrow(datavalid)
+```
+### 2b) Ridge Regression models
+```{r}
+##Set the same seed for all models
+library(glmnet)
+set.seed(a)
+ridgecv=cv.glmnet(xtrain,ytrain,family = "binomial", alpha = 0,type.measure = "class")
+ridgelam=ridgecv$lambda.min
+##optimal lambda for ridge
+ridgelam
+coeffridge=predict(ridgecv, type="coefficient", s=ridgelam)
+coeffridge
+## categorical prediction (use fixed cutoff = 0.5)
+ridge.prob <- predict(ridgecv, s=ridgelam, newx=xvalid,exact=TRUE,type="response")
+ridge.pred <- ifelse(ridge.prob > 0.5,"P1","P0")
+
+# confusion matrix
+confusion.mat <- table(ridge.pred, datavalid$Made.Donation.in.March.2007)
+confusion.mat
+
+misclassfication_rate_ridge <- 1 - (confusion.mat[2, 2] + confusion.mat[1, 1]) / nrow(datavalid)
+
+```
+### 2c) Lasso Model
+```{r}
+set.seed(a)
+lassocv=cv.glmnet(xtrain,ytrain,family = "binomial", alpha = 1,type.measure = "class")
+lassolam=lassocv$lambda.min
+##optimal lambda for ridge
+lassolam
+coefflasso=predict(lassocv, type="coefficient", s=lassolam)
+coefflasso
+## categorical prediction (use fixed cutoff = 0.5)
+lasso.prob <- predict(lassocv, s=lassolam, newx=xvalid,exact=TRUE,type="response")
+lasso.pred <- ifelse(lasso.prob > 0.5,"P1","P0")
+
+# confusion matrix
+confusion.mat <- table(lasso.pred, datavalid$Made.Donation.in.March.2007)
+confusion.mat
+
+misclassfication_rate_lasso <- 1 - (confusion.mat[2, 2] + confusion.mat[1, 1]) / nrow(datavalid)
+
+```
+### 2d) Elastic Model
+```{r}
+set.seed(a)
+K=10
+n=nrow(xtrain)
+fold=sample(rep(seq(K),length=n))
+
+alphas <- seq(0, 1, 0.01)
+elscv.error = data.frame(alpha=alphas)
+for (i in 1:length(alphas)){
+  elscv = cv.glmnet(xtrain, ytrain, family="binomial", alpha=alphas[i], foldid=fold,type.measure = "class")
+  elscv.error[i, "lambda.min"] = elscv$lambda.min
+  elscv.error[i, "error.min"] = min(elscv$cvm)
+}
+
+##optimal alpha & lambda for elastic mod
+elslam=elscv.error[which.min(elscv.error$error.min), "lambda.min"]
+elsalpha=elscv.error[which.min(elscv.error$error.min), "alpha"]
+elslam
+elsalpha
+
+set.seed(a)
+##prediction of test data using mod with optimal alpha & lambda 
+elscv=cv.glmnet(xtrain, ytrain,family = "binomial", alpha = elsalpha,type.measure = "class")
+coeffels=predict(elscv, type="coefficient", s=elslam)
+coeffels
+## categorical prediction (use fixed cutoff = 0.5)
+en.prob <- predict(elscv,s=elslam,newx=xvalid,type="response",exact=TRUE)
+#hist(Default$glm4.prob)
+en.pred <- ifelse(en.prob > 0.5,"P1","P0")
+
+# confusion matrix
+confusion.mat <- table(en.pred, datavalid$Made.Donation.in.March.2007)
+confusion.mat
+
+misclassfication_rate_en <- 1 - (confusion.mat[2, 2] + confusion.mat[1, 1]) / nrow(datavalid)
+```
+## 2e) Tree
+```{r}
+library("tree")
+
+##Growing a tree
+tree1=tree(Made.Donation.in.March.2007~.,data=datatrain[,-1])
+summary(tree1)
+
+##Pruning by CV
+set.seed(a)
+tree1.cv=cv.tree(tree1,method="misclass")
+
+##optimal size
+optimal1=which.min(tree1.cv$dev)
+optimal.size1=tree1.cv$size[optimal1]
+
+##final pruned tree
+tree1.pruned=prune.tree(tree1,best=optimal.size1)
+plot(tree1.pruned)
+text(tree1.pruned,cex=0.8)
+
+## categorical prediction (use fixed cutoff = 0.5)
+tree.prob <- predict(tree1.pruned,newdata=datavalid,type="vector")
+#hist(Default$glm4.prob)
+tree.pred <- ifelse(tree.prob[,2] > 0.5,"P1","P0")
+
+# confusion matrix
+confusion.mat <- table(tree.pred, datavalid$Made.Donation.in.March.2007)
+confusion.mat
+
+misclassfication_rate_tree <- 1 - (confusion.mat[2, 2] + confusion.mat[1, 1]) / nrow(datavalid)
+```
+## 2f) Random Forest
+```{r}
+library("randomForest")
+
+##find optimal mtry
+p=(ncol(datatrain)-2)
+mserf=rep(0,p)
+for (i in 1:p){
+  set.seed(a)
+  rf=randomForest(Made.Donation.in.March.2007~.,data=datatrain[,-1],ntree=1001,mtry=i)
+  mserf[i]=rf$err.rate[1001]
+}
+optimal2=which.min(mserf)
+
+##random forest  with optimal mtry
+set.seed(a)
+tree2=randomForest(Made.Donation.in.March.2007~.,data=datatrain[,-1],ntree=1001,mtry=optimal2)
+
+importance(tree2)
+varImpPlot(tree2)
+partialPlot(tree2, datatrain,x.var="Months.since.First.Donation",which.class="1")
+partialPlot(tree2, datatrain,x.var="Months.since.Last.Donation",which.class="1")
+partialPlot(tree2, datatrain,x.var="Number.of.Donations",which.class="1")
+
+## categorical prediction (use fixed cutoff = 0.5)
+rf.prob <- predict(tree2,newdata=datavalid,type="prob")
+rf.pred <- ifelse(rf.prob[,2] > 0.5,"P1","P0")
+
+# confusion matrix
+confusion.mat <- table(rf.pred, datavalid$Made.Donation.in.March.2007)
+confusion.mat
+
+misclassfication_rate_rf <- 1 - (confusion.mat[2, 2] + confusion.mat[1, 1]) / nrow(datavalid)
+```
+### 2g) Gradient Boosting Machine
+```{r}
+
+library("xgboost")
+library("ggplot2")
+ytrainnum=as.numeric(ytrain)-1
+dtrain <- xgb.DMatrix(data=xtrain, label=ytrainnum)
+
+objective <- "binary:logistic"
+cv.fold <- 10
+#```
+
+# parameter ranges
+max_depths <- c(1, 2, 3)  # candidates for d
+etas <- c(0.01,0.0075, 0.005, 0.001)  # candidates for lambda
+subsamples <- c(0.3,0.4,0.5,0.6, 0.75, 1)
+colsamples <- c(0.6, 0.8,0.9,0.95,1)
+
+tune.out <- data.frame()
+for (max_depth in max_depths) {
+  for (eta in etas) {
+    for (subsample in subsamples) {
+      for (colsample in colsamples) {
+        # **calculate max n.trees**
+        n.max <- round(100 / (eta * sqrt(max_depth)))
+        set.seed(a)
+        xgb.cv.fit <- xgb.cv(data = dtrain, objective=objective, nfold=cv.fold, early_stopping_rounds=100, verbose=0,
+                             nrounds=n.max, max_depth=max_depth, eta=eta, subsample=subsample, colsample_bytree=colsample)
+        n.best <- xgb.cv.fit$best_ntreelimit
+        if (objective == "reg:linear") {
+          cv.err <- xgb.cv.fit$evaluation_log$test_rmse_mean[n.best]
+        } else if (objective == "binary:logistic") {
+          cv.err <- xgb.cv.fit$evaluation_log$test_error_mean[n.best]
+        }
+        out <- data.frame(max_depth=max_depth, eta=eta, subsample=subsample, colsample=colsample, n.max=n.max, nrounds=n.best, cv.err=cv.err)
+        tune.out <- rbind(tune.out, out)
+      }
+    }
+  }
+}
+opt <- which.min(tune.out$cv.err)
+max_depth.opt <- tune.out$max_depth[opt]
+eta.opt <- tune.out$eta[opt]
+subsample.opt <- tune.out$subsample[opt]
+colsample.opt <- tune.out$colsample[opt]
+nrounds.opt <- tune.out$nrounds[opt]
+opt;max_depth.opt;eta.opt;subsample.opt;colsample.opt;nrounds.opt
+
+# final model
+set.seed(a)
+xgbmod=xgboost(data=dtrain, objective="binary:logistic", nround=nrounds.opt, max.depth=max_depth.opt, eta=eta.opt, subsample=subsample.opt, colsample_bytree=colsample.opt,verbose = 0)
+
+# variable importance
+importance_matrix <- xgb.importance(model = xgbmod, feature_names = colnames(xtrain))
+importance_matrix
+xgb.plot.importance(importance_matrix=importance_matrix,cex=0.8,main="Importance_Matrix_XGB")
+
+```
+
+##Interpretation：
+"Months.since.Last.Donation"" is the most important variable, followed by "number of donations" in predicting whether a donor will return on March 2007
+```{r}
+### Partial Dependence by pdp
+library("pdp")
+pd1 <- partial(xgbmod, train=xtrain, pred.var = "Months.since.Last.Donation", chull = TRUE)
+autoplot(pd1)
+```
+
+###Interpretation：
+If a donor had just donated in the year prior to March 2007, there is lesser probability that he will donate in march 2007. While if a donor had donated for more than a year prior to MArch 2007, there is a slight increase in probability of the donor donating blood in March 2007.
+```{r}
+pd2 <- partial(xgbmod, train=xtrain, pred.var = "Number.of.Donations", chull = TRUE)
+autoplot(pd2)
+```
+
+###Interpretation：
+The larger the number of donations, the more likely would the donor return to donate in MArch 2007.
+```{r}
+
+pd3 <- partial(xgbmod, train=xtrain, pred.var = "Months.since.First.Donation", chull = TRUE)
+autoplot(pd3)
+```
+
+###Interpretation：
+Assuming all else constant, the larger the number of months since the donor's first donation, the lesser prbability of the donor returning to donate in MArch 2007.
+```{r}
+
+## categorical prediction (use fixed cutoff = 0.5)
+xgb.prob <- predict(xgbmod, xvalid,type="prob")
+xgb.pred <-ifelse(xgb.prob > 0.5,"P1","P0")
+
+# confusion matrix
+confusion.mat <- table(xgb.pred, datavalid$Made.Donation.in.March.2007)
+confusion.mat
+
+misclassfication_rate_xgb <- 1 - (confusion.mat[2, 2] + confusion.mat[1, 1]) / nrow(datavalid)
+
+```
+### 2h) Ensemble model - Averaging
+
+There are many ways to ensemble the above models. Here we choose the simplest method which is simple averaging of the probabilities of the above derived models from 2a) to 2g).
+```{r}
+predEnsemble_average = (glm.prob + ridge.prob + lasso.prob + en.prob + tree.prob[,2] + rf.prob[,2] + xgb.prob)/7
+predEnsemble_average_yesno <- ifelse(predEnsemble_average > 0.5, 1, 0)
+misclassification_rate_ensemble_average <- sum(predEnsemble_average_yesno != datavalid$Made.Donation.in.March.2007)/nrow(datavalid) 
+```
+### 2i) Ensemble model - Majority
+
+The other esemble model is to predict based on the majority votes by the models from 2a) to 2g). If 4 or more models predict the response varible as "1", then this model would also predict the response variable as "1", else, it will predict the response variable as "0".
+```{r}
+predglm2a_yesno <- ifelse(glm.prob > 0.5, 1, 0)
+predrid2b_yesno <- ifelse(ridge.prob > 0.5, 1, 0)
+predlas2c_yesno <- ifelse(lasso.prob > 0.5, 1, 0)
+predels2d_yesno <- ifelse(en.prob > 0.5, 1, 0)
+predtre2e_yesno <- ifelse(tree.prob[,2] > 0.5, 1, 0)
+predrft2f_yesno <- ifelse(rf.prob[,2] > 0.5, 1, 0)
+predxgb2g_yesno <- ifelse(xgb.prob > 0.5, 1, 0)
+pred.ensemble.2 <- data.frame(predglm2a_yesno , predrid2b_yesno,predlas2c_yesno,predels2d_yesno,predtre2e_yesno,predrft2f_yesno, predxgb2g_yesno)
+library("functional")
+finalPred <- apply(pred.ensemble.2, 1, Compose(table,
+                                         function(i) i==max(i),
+                                         which,
+                                         names,
+                                         function(i) paste0(i, collapse='/')
+)
+)
+misclassification_rate_ensemble_majority <- sum(finalPred != datavalid$Made.Donation.in.March.2007)/nrow(datavalid)
+```
+## 3) Model Comparison
+
+After comparison made below, we have chose XGBoosting as the best model because it has the lowest misclassification rate
+
+```{r}
+misclassfication_rate_glm
+misclassfication_rate_ridge
+misclassfication_rate_lasso
+misclassfication_rate_en
+misclassfication_rate_tree
+misclassfication_rate_rf
+misclassfication_rate_xgb
+misclassification_rate_ensemble_majority
+misclassification_rate_ensemble_average
+
+library("ROCR")
+mod_glm_pred=prediction(glm.prob, yvalid)
+mod_ridge_pred=prediction(ridge.prob, yvalid)
+mod_lasso_pred=prediction(lasso.prob, yvalid)
+mod_en_pred=prediction(en.prob, yvalid)
+mod_tree_pred=prediction(tree.prob[,2], yvalid)
+mod_rf_pred=prediction(rf.prob[,2], yvalid)
+mod_xgb_pred=prediction(xgb.prob, yvalid)
+modEnsemblePred_avg=prediction(predEnsemble_average, yvalid)
+
+# ROC Curve
+
+mod_glm.ROC <- performance(mod_glm_pred, measure="tpr", x.measure="fpr")
+mod_ridge.ROC <- performance(mod_ridge_pred, measure="tpr", x.measure="fpr")
+mod_lasso.ROC <- performance(mod_lasso_pred, measure="tpr", x.measure="fpr")
+mod_en.ROC <- performance(mod_en_pred, measure="tpr", x.measure="fpr")
+mod_tree.ROC <- performance(mod_tree_pred, measure="tpr", x.measure="fpr")
+mod_rf.ROC <- performance(mod_rf_pred, measure="tpr", x.measure="fpr")
+mod_xgb.ROC <- performance(mod_xgb_pred, measure="tpr", x.measure="fpr")
+mod_ensemble_avg.ROC <- performance(modEnsemblePred_avg, measure="tpr", x.measure="fpr")
+
+plot(mod_glm.ROC, col="yellow")
+plot(mod_ridge.ROC, col="orange",add=TRUE)
+plot(mod_lasso.ROC, col="blue",add=TRUE)
+plot(mod_en.ROC, col="red",add=TRUE)
+plot(mod_tree.ROC, col="green",add=TRUE)
+plot(mod_rf.ROC, col="brown",add=TRUE)
+plot(mod_xgb.ROC, col="purple",add=TRUE)
+plot(mod_ensemble_avg.ROC, col="turquoise",add=TRUE)
+abline(v=0.5,col="black",lty=3)
+
+legend(x=0.6, y=0.5, legend=c("Logistic","Ridge","Lasso","Elastic","Tree", "Random Forest", "Gradient Boosting Machines","Ensemble_AVG"), lty=c(1, 1, 1), lwd=c(2, 2, 2), col=c("yellow","orange", "blue", "red","green","brown","purple","turquoise"),cex=0.8)
+
+# Plot of Misclassification rate against cutoff
+mod_glm.err=performance(mod_glm_pred, measure="err")
+mod_ridge.err=performance(mod_ridge_pred, measure="err")
+mod_lasso.err=performance(mod_lasso_pred, measure="err")
+mod_en.err=performance(mod_en_pred, measure="err")
+mod_tree.err=performance(mod_tree_pred, measure="err")
+mod_rf.err=performance(mod_rf_pred, measure="err")
+mod_xgb.err=performance(mod_xgb_pred, measure="err")
+mod_ensemble_avg.err=performance(modEnsemblePred_avg, measure="err")
+
+plot(mod_glm.err, col="yellow",ylim=c(0.15,0.76),xlim=c(-0.0,0.95))
+plot(mod_ridge.err, col="orange",ylim=c(0.15,0.8),xlim=c(-0.0,0.95),add=TRUE)
+plot(mod_lasso.err, col="blue",add=TRUE)
+plot(mod_en.err, col="red",add=TRUE)
+plot(mod_tree.err, col="green",add=TRUE)
+plot(mod_rf.err, col="brown",add=TRUE)
+plot(mod_xgb.err, col="purple",add=TRUE)
+plot(mod_ensemble_avg.err, col="turquoise",add=TRUE)
+abline(v=0.5,col="black",lty=3)
+
+legend(x=0.55, y=0.76, legend=c("Logistic","Ridge","Lasso","Elastic","Tree", "Random Forest", "Gradient Boosting Machines","Ensemble_Avg"), lty=c(1, 1, 1), lwd=c(2, 2, 2), col=c("yellow","orange", "blue", "red","green","brown","purple","turquoise"),cex=0.8)
+
+# AUC values
+mod_glm.auc <- performance(mod_glm_pred, "auc")
+mod_ridge.auc <- performance(mod_ridge_pred, "auc")
+mod_lasso.auc <- performance(mod_lasso_pred, "auc")
+mod_en.auc <- performance(mod_en_pred, "auc")
+mod_tree.auc <- performance(mod_tree_pred, "auc")
+mod_rf.auc <- performance(mod_rf_pred, "auc")
+mod_xgb.auc <- performance(mod_xgb_pred, "auc")
+mod_ensemble_avg.auc <- performance(modEnsemblePred_avg, "auc")
+
+mod_glm.auc@y.values[[1]]
+mod_ridge.auc@y.values[[1]]
+mod_lasso.auc@y.values[[1]]
+mod_en.auc@y.values[[1]]
+mod_tree.auc@y.values[[1]]
+mod_rf.auc@y.values[[1]]
+mod_xgb.auc@y.values[[1]]
+mod_ensemble_avg.auc@y.values[[1]]
+```
+## 4) Final Model
+
+Best Model : We find best cutoff based on cost. False negative has lower cost than False positive 
+
+Reason is because we want to make sure that people are who are predicted to be return donors actually come
+
+If we get false negative, it means people who are not predicted to come actually come - which is not such a bad thing :)
+
+We set the cutoff at the best cutoff above.
+
+In terms of misclassification rate, the xgboost models performs best among all the models(lowest misclass rate)
+```{r}
+cost.xgb <- performance(mod_xgb_pred, measure = "cost", cost.fn = 1, cost.fp = 2)
+plot(cost.xgb)
+
+minimum_cost <- which.min(cost.xgb@y.values[[1]])
+minimum_cost
+# Best cutoff that gives the minimum cost
+best_cutoff <- cost.xgb@x.values[[1]][minimum_cost]
+best_cutoff
+
+xgb.prob <- predict(xgbmod, xvalid,type="prob")
+xgb.pred <-ifelse(xgb.prob > best_cutoff,1,0)
+
+# confusion matrix based on the optimal cutoff
+confusion.mat <- table(xgb.pred, datavalid$Made.Donation.in.March.2007)
+confusion.mat
+
+TP <- confusion.mat[2, 2]
+TP
+TN <- confusion.mat[1, 1]
+TN 
+FP <- confusion.mat[2, 1]
+FP
+FN <- confusion.mat[1, 2]
+FN
+sensitivity <- TP / (TP + FN)
+sensitivity
+fallout <- FP/ (FP + TN)
+fallout
+specificity <- TN / (FP + TN)
+specificity
+precision <- TP / (TP + FP)
+precision
+missout <- FN/ (TP + FN)
+missout
+accuracy <- (TP + TN) / nrow(datavalid)
+accuracy
+```
+## 5.1) Create submission file(xgboost)
+```{r}
+testdata = read.csv("D:/2_Materials/1_Personal/21_MSBA/5_Semester 1/3_STATISTICS/Final project/3_Predict Blood Donations/Datasets/Testing data/Testing.csv", stringsAsFactors = FALSE)
+
+#type conversion
+testdata$X = as.numeric(testdata$X)
+testdata$Months.since.Last.Donation = as.numeric(testdata$Months.since.Last.Donation)
+testdata$Number.of.Donations = as.numeric(testdata$Number.of.Donations)
+testdata$Total.Volume.Donated..c.c.. = as.numeric(testdata$Total.Volume.Donated..c.c..)
+testdata$Months.since.First.Donation = as.numeric(testdata$Months.since.First.Donation)
+
+dtest <- xgb.DMatrix(data = data.matrix( testdata ), missing = NA )
+
+xgb.prob.test <- predict(xgbmod, dtest,type="prob")
+
+test.submit = data.frame(X=1:nrow(testdata))
+test.submit$X = testdata[,"X"]
+test.submit$Donated_prob = xgb.prob.test
+colnames(test.submit) = c("", "Made Donation in March 2007")
+
+# save prediction to file
+write.csv(test.submit, file="D:/2_Materials/1_Personal/21_MSBA/5_Semester 1/3_STATISTICS/Final project/3_Predict Blood Donations/Datasets/Testing data/Testing_Prob.csv", row.names = FALSE)
+```
+
+## 5.2) Create submission file(ensemble)
+```{r}
+#glm
+## categorical prediction
+glm.prob.test <- predict(glm.best, newdata=testdata, type="response")
+
+temp =  testdata[,2:3]
+temp$Months.since.First.Donation = testdata$Months.since.First.Donation
+test.matrix = as.matrix(temp)
+ridge.prob.test <- predict(ridgecv, s=ridgelam, newx=test.matrix,exact=TRUE,type="response")
+
+#Lasso
+lasso.prob.test <- predict(lassocv, s=lassolam, newx=test.matrix,exact=TRUE,type="response")
+
+#Elastic
+en.prob.test <- predict(elscv,s=elslam,newx=test.matrix,type="response",exact=TRUE)
+
+#Tree
+tree.prob.test <- predict(tree1.pruned,newdata=testdata,type="vector")
+
+#Random Forest
+rf.prob.test <- predict(tree2,newdata=testdata,type="prob")
+
+#Gradient Boosting Machine
+xgb.prob.test
+
+#ensemble
+total.average.prob.test = (xgb.prob.test + rf.prob.test[,2] + tree.prob.test[,2] + en.prob.test + lasso.prob.test + ridge.prob.test + glm.prob.test)/7
+
+test.submit = data.frame(X=1:nrow(testdata))
+test.submit$X = testdata[,"X"]
+test.submit$Donated_prob = total.average.prob.test
+colnames(test.submit) = c("", "Made Donation in March 2007")
+
+# save prediction to file
+write.csv(test.submit, file="D:/2_Materials/1_Personal/21_MSBA/5_Semester 1/3_STATISTICS/Final project/3_Predict Blood Donations/Datasets/Testing data/Testing_Prob_Ensemble.csv", row.names = FALSE)
+```
+
