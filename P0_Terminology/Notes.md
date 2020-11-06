@@ -17,3 +17,25 @@
 3. YoLo V5 model architecture
 
     https://medium.com/towards-artificial-intelligence/yolo-v5-explained-and-demystified-4e4719891d69
+    
+4. what is batch normalization, Cross-iteration batch normalization(CBN)?
+    TBA
+    
+5. what is residual connections, Weighted Residual Connections(WRC), Cross-Stage-Partial-connections?
+    TBA
+
+6. what is Cross mini-Batch Normalization (CmBN), Self-adversarial-training (SAT)?
+    TBA
+
+7. what is Mish-activation?
+    TBA
+    
+8. what is Mosaic data augmentation, DropBlock regularization, CIoU loss?
+
+9. what is Path aggregation network(PAN), Convolutional block attention module(CBAM)
+
+9. The most accurate modern neural networks do not operate in real time and require large number of GPUs for training with a large mini-batch-size. YoLo address such problems through creating a CNN that operates in real-time on a conventional GPU, and for which training requires only one conventional GPU.
+
+10. what is model backbone, neck, head?
+    https://openaccess.thecvf.com/content_CVPR_2020/papers/Guo_Hit-Detector_Hierarchical_Trinity_Architecture_Search_for_Object_Detection_CVPR_2020_paper.pdf
+    
