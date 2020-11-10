@@ -2,3 +2,5 @@
     https://towardsdatascience.com/time-series-forecasting-with-deep-learning-and-attention-mechanism-2d001fc871fc
     Stock prices forecasting - Many advanced Time Series Forecasting models are used to predict stock prices, since in the historical sequences there is a lot of noise and a high uncertainty in the information, that may depend on several factors not always closely related to the stock market.
     Text generation - When we write a text on the smartphone, it looks at the last written words and at the typed letters, and suggests the next letters or even the whole word.
+    
+2. study  Single shot multibox detector(SSD), one stage object detector
