@@ -37,5 +37,6 @@
 9. The most accurate modern neural networks do not operate in real time and require large number of GPUs for training with a large mini-batch-size. YoLo address such problems through creating a CNN that operates in real-time on a conventional GPU, and for which training requires only one conventional GPU.
 
 10. what is model backbone, neck, head?
+    Generally, object detector consists of four parts: a backbone that extracts features from input images, a neck attached to backbone that fuses multi-level features, a region proposal network which generates prediction candidates on extracted features, and a head for classification and localization.
     https://openaccess.thecvf.com/content_CVPR_2020/papers/Guo_Hit-Detector_Hierarchical_Trinity_Architecture_Search_for_Object_Detection_CVPR_2020_paper.pdf
     
